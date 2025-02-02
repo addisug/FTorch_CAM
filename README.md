@@ -141,14 +141,8 @@ end module pytorch_test
 
 ### 4. Integrate with CAM
 
-To obtain the CAM_CESM code, you need to do the following:  
-```bash
-git clone https://github.com/jedwards4b/cesm.git cesm2.1-alphabranch-ftorch
-cd cesm2.1-alphabranch-ftorch/
-./manage_externals/checkout_externals
-```
 
-Add the Fortran interface 'pytorch_test.F90' in the 'src/physics/cam'. 
+Make sure the Fortran interface 'pytorch_test.F90' in the 'src/physics/cam'. 
 Then edit 'physpkg.F90' file:
 
 ```bash
