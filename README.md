@@ -10,7 +10,7 @@ This documentation assumes you have:
 - An active account on NCAR's Derecho system
 - Basic familiarity with HPC environments and module systems
 
-## What is FTorch
+## What is FTorch?
 
 FTorch is a specialized interface library that:
 
@@ -162,7 +162,7 @@ At the end of subroutine 'phys_init', add the following:
     call neural_net()
 ```
 
-### 6. Compile and RUN
+### 5. Compile and RUN
 
 Compile the CAM model, in this case we used gnu compiler. 
 ```bash
