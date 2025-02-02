@@ -80,11 +80,19 @@ python constant_model.py
 
 ### 3. Create Fortran Interface
 
+CAM-CESM code for this exercise can be obtained as following:
 ```bash
 git clone https://github.com/jedwards4b/cesm.git cesm2.1-alphabranch-ftorch
 cd cesm2.1-alphabranch-ftorch/
 ./manage_externals/checkout_externals
 ```
+
+Create a file named pytorch_test.F90 in your CAM source directory. The recommended location is:
+```bash
+vi  components/cam/src/physics/cam/pytorch_test.F90
+```
+
+In your Fortran interface file, specify the path to your PyTorch model:
 
 ```fortran
 module pytorch_test
