@@ -43,28 +43,25 @@ import torch.nn as nn
 class ConstantModel(nn.Module):
     def __init__(self):
         super(ConstantModel, self).__init__()
-    
+
     def forward(self, x):
         # Always return a tensor of ones with the same shape as input
         return torch.ones_like(x, dtype=torch.float)
 
-def create_and_save_model():
-    # Instantiate the model
-    model = ConstantModel()
-    
-    # Export to TorchScript format (required for FTorch)
-    model_scripted = torch.jit.script(model)
-    
-    # Save the model
-    model_scripted.save("constant_model.pt")
-    
-    # Test the model
-    example_input = torch.tensor([0.5])
-    output = model(example_input)
-    print(f"Test input: {example_input}")
-    print(f"Test output: {output}")
+# Instantiate the model
+model = ConstantModel()
 
-if __name__ == "__main__":
+# Export to TorchScript format (required for FTorch)
+model_scripted = torch.jit.script(model)
+
+# Save the model
+model_scripted.save("constant_model.pt")
+
+# Test the model
+example_input = torch.tensor([0.5])
+output = model(example_input)
+print(f"Test input: {example_input}")
+print(f"Test output: {output}")
 ```
 
 ### 2. Test Model on Derecho
@@ -72,11 +69,15 @@ if __name__ == "__main__":
 ```bash
 # Load required modules
 module load conda
+# if pytorch isn't installed in the conda enviroment, create the environment and install it
+create --name pytorch_env
 conda activate pytorch_env
+conda install pytorch
 
 # Run the Python script
 python constant_model.py
 ```
+The model 'constant_model.pt' will be generated
 
 ### 3. Create Fortran Interface
 
