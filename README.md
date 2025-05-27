@@ -454,3 +454,184 @@ Setup, build and submit
 ./xmlchange PROJECT=your project number
 ./case.submit
 ```
+###  Example 3 - Integration of ML Warm Microphysics 
+
+Integrating a ML based parameterization for warm rain microphysics into the Community Earth System Model (CESM) using the FTorch interface. The integration enables CESM to emulate microphysical tendencies using a PyTorch-trained neural network and associated quantile transformation functions.
+
+
+## 1. Overview
+
+The integration includes four main components:
+- Model Initialization: Loads the TorchScript model and quantile scaling files.
+- Neural Network Prediction: Performs batched inference using FTorch.
+- Microphysical Emulation: Applies the ML model to compute physical tendencies.
+- Quantile Transformation: Scales inputs/outputs to match the ML model’s training distribution.
+
+## 2. Subroutine: 'initialize_tau_emulators'
+
+Initializes the neural network model and loads the associated quantile scaling parameters.
+
+Inputs:
+- 'stochastic_emulated_filename_quantile': Path to the TorchScript model.
+- 'stochastic_emulated_filename_input_scale': Path to input scaling file.
+- 'stochastic_emulated_filename_output_scale': Path to output scaling file.
+- 'iulog': Log file unit.
+- 'errstring': Error message output.
+
+Actions:
+- Loads the neural network model using 'init_neural_net'.
+- Loads input/output scaling files using 'load_quantile_scale_values'.
+
+
+## 3. Subroutine: 'init_neural_net'
+
+Loads the TorchScript model into memory using FTorch.
+
+Inputs:
+- 'filename': Path to TorchScript model (`.pt`).
+- 'batch_size': Batch size for inference.
+- 'iolog': Log file unit.
+
+Outputs:
+- 'model_ftorch': FTorch model handle.
+- 'errstring': Error message output.
+
+Details:
+- Uses 'torch_model_load()' to read the model.
+- Logs success and model properties.
+
+
+## 4. Subroutine: 'tau_emulated_cloud_rain_interactions'
+
+Performs the core emulation of cloud-rain microphysics using the neural network.
+
+Inputs:
+- Physical state variables: 'qc', 'qr', 'nc', 'nr', 'pgam', 'lamc', 'lamr', 'n0r', 'rho'
+- Constants: 'mgncol', 'q_small'
+
+Outputs:
+- Microphysics tendencies: 'qc_tend', 'qr_tend', 'nc_tend', 'nr_tend'
+
+ Workflow:
+1. Construct 'nn_inputs' vector.
+2. Apply 'quantile_transform()' to match ML model scaling.
+3. Run forward inference using 'neural_net_predict()'.
+4. Invert transformation with 'quantile_inv_transform()'.
+5. Assign outputs to prognostic tendency variables.
+
+
+## 5. Subroutine: 'neural_net_predict'
+
+ Executes the model forward pass.
+
+Inputs:
+- 'input': Input array (2D, physical variables).
+- 'model_ftorch': TorchScript model loaded via FTorch.
+- 'iulog': Log file unit.
+
+Outputs:
+- 'prediction': Model output array (2D).
+
+Notes:
+- Supports batched input.
+- Manages precision conversion.
+- Uses 'torch_tensor_from_array()' and 'torch_model_forward()' from FTorch.
+
+
+## 6. Quantile Transformation Utilities
+
+### 'quantile_transform'
+- Applies input scaling using quantile values stored during training.
+
+### 'quantile_inv_transform'
+- Inverts model outputs back to physical units for use in CESM.
+
+These functions ensure consistency between the ML model’s training distribution and runtime execution in CESM.
+
+
+
+## 7. FTorch CESM Interface Module: 'FTorch_cesm_interface.F90'
+ 
+Provides an abstraction for FTorch operations in CESM, enabling model loading and inference through Fortran.
+
+```fortran
+module FTorch_cesm_interface
+```
+
+### FTorch-Enabled Case ('USE_FTORCH=TRUE')
+Uses FTorch library:
+
+```fortran
+use ftorch, only: torch_kCPU, torch_tensor, torch_model
+use ftorch, only: torch_model_load, torch_model_forward, torch_tensor_from_array, torch_delete
+```
+
+### Fallback Case (FTorch Disabled)
+
+Defines dummy routines that abort execution:
+
+```fortran
+call shr_abort_abort("ERROR: Using FTorch Interface without USE_FTORCH=TRUE")
+```
+
+### Key Routines
+
+| Subroutine                 | Purpose                                  |
+|----------------------------|------------------------------------------|
+| `torch_model_load`         | Load a TorchScript model.                |
+| `torch_tensor_from_array`  | Convert Fortran array to FTorch tensor.  |
+| `torch_model_forward`      | Perform inference.                       |
+| `torch_delete`             | Free allocated Torch object.             |
+
+### Types Defined
+
+- 'torch_model' : Neural net handle.
+- 'torch_tensor': Input/output tensor handle.
+
+
+## 8. Model Requirements
+
+To ensure compatibility with the FTorch interface, the ML model must:
+- Be saved in 'TorchScript' format ('torch.jit.save()').
+- Use consistent 'input feature order*':  
+  'qc', 'qr', 'nc', 'nr', 'pgam', 'lamc', 'lamr', 'n0r', 'rho'.
+- Include 'quantile transformation files' for inputs and outputs 
+<img src="images/ML_Warmrain_flowchart.png" width="300"/>
+
+## 9. Compile and RUN
+
+```bash
+
+```
+Obtain the CAM version/branch that integrates ML warm microphysics using FTorch and Compile the CAM model.  
+```bash
+git clone https://github.com/addisug/CAM.git -b cam6_4_046_ftorch
+./bin/git-fleximod update
+
+./cime/scripts/create_newcase --case /path/test_ftorch --mach derecho  --compset F2000climo --res f09_f09_mg17 --project your project number
+
+./xmlchange USE_FTORCH=TRUE,CAM_CONFIG_OPTS="-phys cam7 -cosp"
+
+./case.setup
+```
+
+You need to specify the path of pytorch model and the input/output scale in your 'user_nl_cam' file in the case directory, you need to write:
+
+```bash
+ vi user_nl_cam
+ stochastic_emulated_filename_quantile = '/glade/work/addisus/mlmicrophysics/tau_run_10/input_output_1193/quantile_neural_net_v2.pt'
+ stochastic_emulated_filename_input_scale = '/glade/work/addisus/mlmicrophysics/tau_run_10/input_output_1193/input_quantile_scaler.nc'
+ stochastic_emulated_filename_output_scale = '/glade/work/addisus/mlmicrophysics/tau_run_10/input_output_1193/output_quantile_scaler.nc'
+```
+
+Build and submit
+
+```bash
+./case.build 
+./xmlchange STOP_OPTION=ndays
+./xmlchange STOP_N=1
+./xmlchange RESUBMIT=0
+./xmlchange JOB_WALLCLOCK_TIME=00:20:00
+./xmlchange PROJECT=your project number
+./case.submit
+```
