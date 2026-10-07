@@ -79,18 +79,47 @@ python constant_model.py
 ```
 The model 'constant_model.pt' will be generated
 
-### 3. Create Fortran Interface
+Deactivate the conda environment before going on to the CESM steps:
+```bash
+conda deactivate
+python --version
+```
+The CESM scripts of this branch need Python 3.11 or older. With a newer Python (for example 3.13 from 'pytorch_env') they stop with `ModuleNotFoundError: No module named 'imp'`.
+
+### 3. Get the CAM-CESM code
 
 CAM-CESM code for this exercise can be obtained as following:
 ```bash
-git clone https://github.com/jedwards4b/cesm.git cesm2.1-alphabranch-ftorch
-cd cesm2.1-alphabranch-ftorch/
+git clone -b cesm2.1-alphabranch-ftorch https://github.com/jedwards4b/cesm.git cesm2.1_ftorch
+cd cesm2.1_ftorch/
 ./manage_externals/checkout_externals
 ```
+The `-b cesm2.1-alphabranch-ftorch` option is required. Without it you get the 'master' branch, which is a different CESM version without the FTorch support.
 
-Create a file named pytorch_test.F90 in your CAM source directory. The recommended location is:
+Check that you are on the FTorch branch:
 ```bash
-vi  components/cam/src/physics/cam/pytorch_test.F90
+git status -sb
+git -C components/cam status -sb
+git -C cime status -sb
+```
+The three commands should show 'cesm2.1-alphabranch-ftorch', 'cam_cesm2_1_rel_ftorch' and 'maint-5.6-ftorch'.
+
+### 4. Create the case
+
+In this case we used gnu compiler. On Derecho, this branch loads the 'libtorch' and 'ftorch' modules only for the gnu compiler.
+```bash
+./cime/scripts/create_newcase --case /path/test_ftorch --mach derecho --compiler gnu --compset FHIST --res f09_f09_mg17 --project your project number
+cd /path/test_ftorch
+./case.setup
+```
+
+### 5. Create Fortran Interface
+
+The source code changes are placed in the 'SourceMods/src.cam' directory of the case, so the CESM source tree is not modified.
+
+Create a file named pytorch_test.F90 in 'SourceMods/src.cam':
+```bash
+vi SourceMods/src.cam/pytorch_test.F90
 ```
 
 In your Fortran interface file, specify the path to your PyTorch model:
@@ -132,7 +161,7 @@ contains
 
      call torch_tensor_from_array(in_tensor(1), in_data, in_layout, torch_kCPU) ! Ftorch
      call torch_tensor_from_array(out_tensor(1), out_data, out_layout, torch_kCPU)
-    call torch_model_forward(model_pytorch, in_tensor, out_tensor)
+     call torch_model_forward(model_pytorch, in_tensor, out_tensor)
 
   end subroutine neural_net
 
@@ -140,21 +169,20 @@ end module pytorch_test
 
 ```
 
-### 4. Integrate with CAM
+### 6. Integrate with CAM
 
-
-Make sure the Fortran interface 'pytorch_test.F90' in the 'src/physics/cam'. 
-Then edit 'physpkg.F90' file:
+Copy 'physpkg.F90' from the CESM source tree into 'SourceMods/src.cam' and edit the copy:
 
 ```bash
-vi src/physics/cam/physpkg.F90
+cp /path/cesm2.1_ftorch/components/cam/src/physics/cam/physpkg.F90 SourceMods/src.cam/
+vi SourceMods/src.cam/physpkg.F90
 ```
-Insert the following line at the beginning of the file
+Insert the following line at the beginning of the module, above 'use shr_kind_mod':
 ```fortran
 use pytorch_test,        only: init_neural_net, neural_net
 ```
 
-At the end of subroutine 'phys_init', add the following:
+At the end of subroutine 'phys_init', after 'call qneg_init()', add the following:
 ```fortran
  ! Test for neural network initialization
     call init_neural_net()
@@ -163,24 +191,25 @@ At the end of subroutine 'phys_init', add the following:
     call neural_net()
 ```
 
-### 5. Compile and RUN
-
-Compile the CAM model, in this case we used gnu compiler. 
-```bash
-./cime/scripts/create_newcase --case /path/test_ftorch --mach derecho --compiler gnu --compset FHIST --res f09_f09_mg17 --project your project number
+This branch already calls its own example network ('cam_nn.F90') at every physics time step. It is not used in this exercise, so comment out the call in 'physpkg.F90':
+```fortran
+#ifdef USE_FTORCH
+    ! Add ML model
+    ! call torch_inference(phys_state)
+#endif
 ```
 
+### 7. Compile and RUN
 
 Export FTorch environment:
 ```bash
 export USE_FTORCH=TRUE
-export FTORCH_PREFIX_FTORCH=/root/ftorch/install/path
-export CONDA_PREFIX=FALSE
 ```
-Setup, build and submit
+'USE_FTORCH' has to be exported in the shell where you run './case.build'. The FTorch install path ('FTORCH_PREFIX') is set by the 'ftorch' module that the case loads on Derecho.
+
+Build and submit
 
 ```bash
-./case.setup
 ./case.build 
 ./xmlchange STOP_OPTION=ndays
 ./xmlchange STOP_N=1
@@ -188,6 +217,11 @@ Setup, build and submit
 ./xmlchange JOB_WALLCLOCK_TIME=00:20:00
 ./xmlchange PROJECT=your project number
 ./case.submit
+```
+
+When the job has finished, the last lines of the 'CaseStatus' file should show 'case.run success':
+```bash
+tail CaseStatus
 ```
 
 
@@ -255,8 +289,8 @@ The model 'simplenet_model.pt' will be generated
 
 CAM-CESM code for this exercise can be obtained as following:
 ```bash
-git clone https://github.com/jedwards4b/cesm.git cesm2.1-alphabranch-ftorch
-cd cesm2.1-alphabranch-ftorch/
+git clone -b cesm2.1-alphabranch-ftorch https://github.com/jedwards4b/cesm.git cesm2.1_ftorch
+cd cesm2.1_ftorch/
 ./manage_externals/checkout_externals
 ```
 
