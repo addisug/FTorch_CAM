@@ -674,7 +674,44 @@ Build and submit
 
 The examples above run on Derecho. A Docker image is also available to run CAM7 with FTorch on a Mac, without a Derecho account. It contains CESM3, FTorch, and the Yuval-O'Gorman (YOG) neural-network deep convection scheme, which CAM calls through FTorch.
 
-Pull the image from <https://hub.docker.com/r/addisusemie/cesm-ml-mac> and start a container. You need a Mac with an Apple Silicon chip and Docker running:
+### Install Docker
+
+You need a Mac with an Apple Silicon chip (M1 or later; see Apple menu > About This Mac) and about 60 GB of free disk space. First check whether Docker is already installed, in the Terminal app:
+
+```bash
+docker --version
+```
+
+If this prints a version number, go to the next section. If it prints `command not found`, install Docker in one of these two ways.
+
+Option 1, Docker Desktop:
+
+1. Download "Docker Desktop for Mac with Apple silicon" from <https://www.docker.com/products/docker-desktop/>.
+2. Open the downloaded `.dmg` file and drag Docker to the Applications folder.
+3. Open Docker from Applications and accept the terms. It asks for your Mac password the first time.
+4. Wait until the whale icon in the menu bar stops moving.
+5. In Docker Desktop, open Settings > Resources, set Memory to 16 GB or more, CPUs to 4 or more and the disk limit to 60 GB or more, then click "Apply & Restart".
+
+Option 2, Colima (command line, needs [Homebrew](https://brew.sh)):
+
+```bash
+brew install colima docker
+colima start --cpu 8 --memory 16 --disk 60
+```
+
+Colima does not start by itself after a reboot. Run `colima start` again before using Docker.
+
+With either option, open a new Terminal window and check that Docker works:
+
+```bash
+docker run --rm hello-world
+```
+
+It should print "Hello from Docker!". If it prints `Cannot connect to the Docker daemon`, Docker is not running: open Docker Desktop, or run `colima start`.
+
+### Get the image and start a container
+
+Pull the image from <https://hub.docker.com/r/addisusemie/cesm-ml-mac> and start a container:
 
 ```bash
 docker pull addisusemie/cesm-ml-mac:v1
