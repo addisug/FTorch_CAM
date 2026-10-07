@@ -669,3 +669,47 @@ Build and submit
 ./xmlchange PROJECT=your project number
 ./case.submit
 ```
+
+## Using Docker image
+
+The examples above run on Derecho. A Docker image is also available to run CAM7 with FTorch on a Mac, without a Derecho account. It contains CESM3, FTorch, and the Yuval-O'Gorman (YOG) neural-network deep convection scheme, which CAM calls through FTorch.
+
+Pull the image from <https://hub.docker.com/r/addisusemie/cesm-ml-mac> and start a container. You need a Mac with an Apple Silicon chip and Docker running:
+
+```bash
+docker pull addisusemie/cesm-ml-mac:v1
+mkdir -p ~/cesm_work
+docker run --rm -it --shm-size=4g -v ~/cesm_work:/cesm addisusemie/cesm-ml-mac:v1
+```
+
+The remaining commands are typed inside the container. `/cesm` there is `~/cesm_work` on the Mac, so cases and output are kept after `exit`.
+
+### Identify where the FTorch files are indicated
+
+Create the YOG case without building it, then look at where FTorch and the neural-network files are set:
+
+```bash
+STOP_N=1 ML_MODE=yog run_ml_case create      # 1-day run length is set here
+cd /cesm/cases/cam7_ne16_yog
+./xmlquery USE_FTORCH,TORCH_DIR                     # FTorch switch and Torch library
+cat user_nl_cam                                     # neural-network files read at run time
+grep -il ftorch /opt/cesm/components/cam/src/physics/cam/*.F90    # CAM code that calls FTorch
+```
+
+| What | Where |
+|---|---|
+| FTorch switch and Torch location for the build | `USE_FTORCH`, `TORCH_DIR` in the case (`env_build.xml`) |
+| Torch library | `/opt/libtorch` |
+| FTorch source and its CESM interface | `/opt/cesm/libraries/FTorch` |
+| CAM code that calls FTorch | `nn_interface_cam.F90`, `nn_cf_net.F90`, `nn_convection_flux.F90`, `yog_intr.F90` in `/opt/cesm/components/cam/src/physics/cam` |
+| YOG network, scaling file and sounding | `yog_nn_weights`, `yog_nn_scale`, `SAM_sounding` in `user_nl_cam`, pointing to `/opt/ml/models/yog` |
+
+### Make a test run
+
+```bash
+ML_MODE=yog run_ml_case                   # build, then run the 1 day set above
+tail -3 /cesm/cases/cam7_ne16_yog/CaseStatus
+ls /cesm/scratch/cam7_ne16_yog/run/*.cam.h*.nc
+```
+
+The run worked if `CaseStatus` ends with `case.run success` and the output files exist. The first run downloads about 9 GB of input data.
