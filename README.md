@@ -684,12 +684,25 @@ docker run --rm -it --shm-size=4g -v ~/cesm_work:/cesm addisusemie/cesm-ml-mac:v
 
 The remaining commands are typed inside the container. `/cesm` there is `~/cesm_work` on the Mac, so cases and output are kept after `exit`.
 
+Set up the session first. These lines are needed each time you start the container:
+
+```bash
+export USER=cesm
+mkdir -p ~/bin && ln -sf /usr/bin/python3 ~/bin/python && export PATH=~/bin:$PATH
+git config --global user.name "CESM user"
+git config --global user.email cesm@localhost
+git config --global --add safe.directory '*'
+```
+
+CESM reads the user name from `USER`, calls `python` during the case setup, and records each new case in a local git repository, which needs a name and email.
+
 ### Identify where the FTorch files are indicated
 
 Create the YOG case without building it, then look at where FTorch and the neural-network files are set:
 
 ```bash
-STOP_N=1 ML_MODE=yog run_ml_case create      # 1-day run length is set here
+rm -rf /cesm/cases/cam7_ne16_yog /cesm/scratch/cam7_ne16_yog      # remove any earlier attempt
+STOP_N=1 ML_MODE=yog run_ml_case create 2>&1 | tee /cesm/create.log      # 1-day run length is set here
 cd /cesm/cases/cam7_ne16_yog
 ./xmlquery USE_FTORCH,TORCH_DIR                     # FTorch switch and Torch library
 cat user_nl_cam                                     # neural-network files read at run time
